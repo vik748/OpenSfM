@@ -576,11 +576,9 @@ def absolute_pose_known_rotation_ransac(bs, Xs, method, threshold, iterations, p
         params.iterations = 1000
         result = pyrobust.ransac_absolute_pose_known_rotation(bs, Xs, threshold, params, pyrobust.RansacType.RANSAC)
 
-        Rt = result.lo_model.copy()
-        R, t = Rt[:3, :3].copy(), Rt[:, 3].copy()
-        Rt[:3, :3] = R.T
-        Rt[:, 3] = -R.T.dot(t)
-        return Rt
+        t = -result.lo_model.copy()
+        R = np.identity(3)
+        return np.concatenate((R, [[t[0]], [t[1]], [t[2]]]), axis=1)
     else:
         try:
             return pyopengv.absolute_pose_ransac(
