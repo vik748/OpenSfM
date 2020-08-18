@@ -3,7 +3,7 @@
 import time
 import logging
 import numpy as np
-import sys
+import sys, os
 import cv2
 
 from opensfm import context
@@ -11,6 +11,13 @@ from opensfm import pyfeatures
 
 logger = logging.getLogger(__name__)
 
+file_dir = os.path.dirname(__file__)
+zernike_dir = os.path.join(file_dir, '../external_packages/zernike_py/')
+sys.path.insert(0, os.path.abspath(zernike_dir))
+
+from joblib import Memory
+cache_dir = os.path.join(file_dir, '../cache/')
+memory = Memory(location=cache_dir, verbose=0)
 
 def resized_image(image, config):
     """Resize image to feature_process_size."""
@@ -246,6 +253,27 @@ def extract_features_orb(image, config):
     logger.debug('Found {0} points in {1}s'.format(len(points), time.time() - t))
     return points, desc
 
+def extract_features_zernike(image, config):
+    if context.OPENCV3:
+        from zernike_py.MultiHarrisZernike import MultiHarrisZernike                        
+            
+        MultiHarrisZernike_cached = memory.cache(MultiHarrisZernike)
+        
+        #t = time.time()
+        detector = MultiHarrisZernike_cached(Nfeats= int(config['feature_min_frames']), 
+                                             **config['ZERNIKE_settings'])
+        #logger.debug('Detector created in {:.4f}s'.format(time.time() - t))
+                        
+    else:
+        raise NotImplementedError("MultiHarrisZernike not implemented for OPENCV2")
+
+    t = time.time()
+
+    points, desc = detector.detectAndCompute(image)
+    points = np.array([(i.pt[0], i.pt[1], i.size, i.angle) for i in points])
+
+    logger.debug('Found {} points in {:.4f}s'.format(len(points), time.time() - t))
+    return points, desc
 
 def extract_features(color_image, config):
     """Detect features in an image.
@@ -277,9 +305,11 @@ def extract_features(color_image, config):
         points, desc = extract_features_hahog(image, config)
     elif feature_type == 'ORB':
         points, desc = extract_features_orb(image, config)
+    elif feature_type == 'ZERNIKE':        
+        points, desc = extract_features_zernike(image, config)        
     else:
         raise ValueError('Unknown feature type '
-                         '(must be SURF, SIFT, AKAZE, HAHOG or ORB)')
+                         '(must be SURF, SIFT, AKAZE, HAHOG, ORB or ZERNIKE)')
 
     xs = points[:, 0].round().astype(int)
     ys = points[:, 1].round().astype(int)

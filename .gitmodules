@@ -1,3 +1,6 @@
 [submodule "opensfm/src/third_party/pybind11"]
 	path = opensfm/src/third_party/pybind11
 	url = https://github.com/pybind/pybind11.git
+[submodule "external_packages/zernike_py"]
+	path = external_packages/zernike_py
+	url = https://gitlab.com/neufieldrobotics/zernike_py.git

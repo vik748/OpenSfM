@@ -37,6 +37,19 @@ hahog_peak_threshold: 0.00001
 hahog_edge_threshold: 10
 hahog_normalize_to_uchar: yes
 
+# Params for Zernike
+ZERNIKE_settings:
+ seci: 3
+ secj: 4
+ levels: 6
+ ratio: 0.75
+ sigi: 2.75
+ sigd: 1.0
+ nmax: 8
+ like_matlab: False
+ lmax_nd: 3
+ harris_threshold: 0.1
+
 # Params for general matching
 lowes_ratio: 0.8              # Ratio test for matches
 matcher_type: FLANN           # FLANN, BRUTEFORCE, or WORDS
