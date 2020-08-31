@@ -90,10 +90,87 @@ def _in_mask(point, width, height, mask):
     v = mask.shape[0] * (point[1] + 0.5) / height
     return mask[int(v), int(u)] != 0
 
+def bounding_box(points, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
+                        max_y=np.inf):
+    """ Compute a bounding_box filter on the given points
+
+    Parameters
+    ----------
+    points: (n,2) array
+        The array containing all the points's coordinates. Expected format:
+            array([
+                [x1,y1],
+                ...,
+                [xn,yn]])
+
+    min_i, max_i: float
+        The bounding box limits for each coordinate. If some limits are missing,
+        the default values are -infinite for the min_i and infinite for the max_i.
+
+    Returns
+    -------
+    bb_filter : boolean array
+        The boolean mask indicating wherever a point should be keept or not.
+        The size of the boolean mask will be the same as the number of given points.
+
+    """
+
+    bound_x = np.logical_and(points[:, 0] > min_x, points[:, 0] < max_x)
+    bound_y = np.logical_and(points[:, 1] > min_y, points[:, 1] < max_y)
+
+    bb_filter = np.logical_and(bound_x, bound_y)
+
+    return bb_filter
+
+
+def tiled_features(kp, img_shape, tiles_hor, tiles_ver, no_features = None):
+    '''
+    Given a set of keypoints, this divides the image into a grid and returns
+    len(kp)/(tiles_ver*tiles_hor) maximum responses within each tell. If that cell doesn't
+    have enough points it will return all of them.
+    '''
+    if no_features:
+        feat_per_cell = np.ceil(no_features/(tiles_ver*tiles_hor)).astype(int)
+    else:
+        feat_per_cell = np.ceil(len(kp)/(tiles_ver*tiles_hor)).astype(int)
+    HEIGHT, WIDTH = img_shape
+    assert WIDTH%tiles_hor == 0, "Width is not a multiple of tiles_ver"
+    assert HEIGHT%tiles_ver == 0, "Height is not a multiple of tiles_hor"
+    w_width = int(WIDTH/tiles_hor)
+    w_height = int(HEIGHT/tiles_ver)
+
+    kps = np.array([])
+    #pts = np.array([keypoint.pt for keypoint in kp])
+    pts = cv2.KeyPoint_convert(kp)
+    kp = np.array(kp)
+
+    #img_keypoints = draw_markers( cv2.cvtColor(raw_images[0], cv2.COLOR_GRAY2RGB), kp, color = ( 0, 255, 0 ))
+
+
+    for ix in range(0,HEIGHT, w_height):
+        for iy in range(0,WIDTH, w_width):
+            inbox_mask = bounding_box(pts, iy, iy+w_height, ix, ix+w_height)
+            inbox = kp[inbox_mask]
+            inbox_sorted = sorted(inbox, key = lambda x:x.response, reverse = True)
+            inbox_sorted_out = inbox_sorted[:feat_per_cell]
+            kps = np.append(kps,inbox_sorted_out)
+
+            #img_keypoints = draw_markers(img_keypoints, kps.tolist(), color = [255, 0, 0] )
+            #cv2.imshow("Selected Keypoints", img_keypoints )
+            #print("Size of Tiled Keypoints: " ,len(kps))
+            #cv2.waitKey();
+    return kps.tolist()
 
 def extract_features_sift(image, config):
     sift_edge_threshold = config['sift_edge_threshold']
     sift_peak_threshold = float(config['sift_peak_threshold'])
+    feature_tiling = config.get('feature_tiling')
+    
+    if not feature_tiling is None:
+        no_features = 2 * config['feature_min_frames']
+    else:
+        no_features = config['feature_min_frames']
+    
     if context.OPENCV3:
         try:
             detector = cv2.xfeatures2d.SIFT_create(
@@ -119,12 +196,19 @@ def extract_features_sift(image, config):
             detector.setDouble("contrastThreshold", sift_peak_threshold)
         points = detector.detect(image)
         logger.debug('Found {0} points in {1}s'.format(len(points), time.time() - t))
-        if len(points) < config['feature_min_frames'] and sift_peak_threshold > 0.0001:
+        if len(points) < no_features and sift_peak_threshold > 0.0001:
             sift_peak_threshold = (sift_peak_threshold * 2) / 3
             logger.debug('reducing threshold')
         else:
             logger.debug('done')
             break
+    
+    if not feature_tiling is None:        
+        points = tiled_features(points, image.shape, 
+                                feature_tiling['horizontal'], feature_tiling['vertical'], 
+                                no_features = int(config['feature_min_frames']) )
+        logger.debug('No SIFT features after tiling {0}'.format(len(points)))
+        
     points, desc = descriptor.compute(image, points)
     if config['feature_root']:
         desc = root_feature(desc)
@@ -235,17 +319,30 @@ def extract_features_hahog(image, config):
 
 
 def extract_features_orb(image, config):
+    feature_tiling = config.get('feature_tiling')
+    
+    if not feature_tiling is None:
+        no_features = 2 * int(config['feature_min_frames'])
+    else:
+        no_features = int(config['feature_min_frames'])
+    
     if context.OPENCV3:
-        detector = cv2.ORB_create(nfeatures=int(config['feature_min_frames']))
+        detector = cv2.ORB_create(nfeatures=no_features)
         descriptor = detector
     else:
         detector = cv2.FeatureDetector_create('ORB')
         descriptor = cv2.DescriptorExtractor_create('ORB')
-        detector.setDouble('nFeatures', config['feature_min_frames'])
+        detector.setDouble('nFeatures', no_features)
 
     logger.debug('Computing ORB')
     t = time.time()
     points = detector.detect(image)
+    
+    if not feature_tiling is None:
+        points = tiled_features(points, image.shape, 
+                                feature_tiling['horizontal'], feature_tiling['vertical'],
+                                no_features = int(config['feature_min_frames']) )
+        logger.debug('No ORB features after tiling {0}'.format(len(points)))
 
     points, desc = descriptor.compute(image, points)
     points = np.array([(i.pt[0], i.pt[1], i.size, i.angle) for i in points])
