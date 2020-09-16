@@ -40,7 +40,7 @@ hahog_normalize_to_uchar: yes
 # Params for Zernike
 ZERNIKE_settings:
  seci: 3
- secj: 4
+ secj: 2
  levels: 6
  ratio: 0.75
  sigi: 2.75
@@ -48,7 +48,7 @@ ZERNIKE_settings:
  nmax: 8
  like_matlab: False
  lmax_nd: 3
- harris_threshold: 0.1
+# harris_threshold: 0.001
 
 # Params for general matching
 lowes_ratio: 0.8              # Ratio test for matches

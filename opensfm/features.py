@@ -320,6 +320,7 @@ def extract_features_hahog(image, config):
 
 def extract_features_orb(image, config):
     feature_tiling = config.get('feature_tiling')
+    orb_fast_threshold = int(config['ORB_settings']['fastThreshold'])
     
     if not feature_tiling is None:
         no_features = 2 * int(config['feature_min_frames'])
@@ -327,12 +328,31 @@ def extract_features_orb(image, config):
         no_features = int(config['feature_min_frames'])
     
     if context.OPENCV3:
-        detector = cv2.ORB_create(nfeatures=no_features)
+        detector = cv2.ORB_create(nfeatures=no_features,
+                                  **config['ORB_settings'])
         descriptor = detector
     else:
         detector = cv2.FeatureDetector_create('ORB')
         descriptor = cv2.DescriptorExtractor_create('ORB')
         detector.setDouble('nFeatures', no_features)
+        detector.setInt('fastThreshold', orb_fast_threshold)
+        
+    while True:
+        logger.debug('Computing orb with threshold {0}'.format(orb_fast_threshold))
+        t = time.time()
+        if context.OPENCV3:
+            detector = cv2.ORB_create(nfeatures=no_features,
+                                      fastThreshold=orb_fast_threshold)
+        else:
+            detector.setInt("fastThreshold", orb_fast_threshold)
+        points = detector.detect(image)
+        logger.debug('Found {0} points in {1}s'.format(len(points), time.time() - t))
+        if len(points) < no_features and orb_fast_threshold > 1:
+            orb_fast_threshold = orb_fast_threshold - 1
+            logger.debug('reducing threshold')
+        else:
+            logger.debug('done')
+            break
 
     logger.debug('Computing ORB')
     t = time.time()
