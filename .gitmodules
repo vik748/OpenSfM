@@ -3,4 +3,4 @@
 	url = https://github.com/pybind/pybind11.git
 [submodule "external_packages/zernike_py"]
 	path = external_packages/zernike_py
-	url = https://gitlab.com/neufieldrobotics/zernike_py.git
+	url = https://github.com/neufieldrobotics/zernike_py.git
