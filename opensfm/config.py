@@ -39,8 +39,8 @@ hahog_normalize_to_uchar: yes
 
 # Params for Zernike
 ZERNIKE_settings:
- seci: 3
- secj: 2
+ seci: 4
+ secj: 3
  levels: 6
  ratio: 0.75
  sigi: 2.75

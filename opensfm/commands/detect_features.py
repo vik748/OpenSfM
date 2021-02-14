@@ -76,12 +76,13 @@ def detect(args):
     fmask = data.load_features_mask(image, p_unmasked)
 
     p_unsorted = p_unmasked[fmask]
-    f_unsorted = f_unmasked[fmask]
-    c_unsorted = c_unmasked[fmask]
 
     if len(p_unsorted) == 0:
         logger.warning('No features found in image {}'.format(image))
         return
+    f_unsorted = f_unmasked[fmask]
+    c_unsorted = c_unmasked[fmask]
+
 
     size = p_unsorted[:, 2]
     order = np.argsort(size)

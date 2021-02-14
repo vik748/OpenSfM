@@ -129,6 +129,8 @@ def tiled_features(kp, img_shape, tiles_hor, tiles_ver, no_features = None):
     len(kp)/(tiles_ver*tiles_hor) maximum responses within each tell. If that cell doesn't
     have enough points it will return all of them.
     '''
+    if len(kp) == 0: return kp
+
     if no_features:
         feat_per_cell = np.ceil(no_features/(tiles_ver*tiles_hor)).astype(int)
     else:
@@ -380,7 +382,7 @@ def extract_features_zernike(image, config):
         detector = MultiHarrisZernike_cached(Nfeats= int(config['feature_min_frames']), 
                                              **config['ZERNIKE_settings'])
         #logger.debug('Detector created in {:.4f}s'.format(time.time() - t))
-                        
+
     else:
         raise NotImplementedError("MultiHarrisZernike not implemented for OPENCV2")
 
@@ -428,12 +430,14 @@ def extract_features(color_image, config):
         raise ValueError('Unknown feature type '
                          '(must be SURF, SIFT, AKAZE, HAHOG, ORB or ZERNIKE)')
 
-    xs = points[:, 0].round().astype(int)
-    ys = points[:, 1].round().astype(int)
-    colors = color_image[ys, xs]
+    if len(points)>0:    
+        xs = points[:, 0].round().astype(int)
+        ys = points[:, 1].round().astype(int)
+        colors = color_image[ys, xs]
 
-    return normalize_features(points, desc, colors,
-                              image.shape[1], image.shape[0])
+        return normalize_features(points, desc, colors,
+                                  image.shape[1], image.shape[0])
+    else: return (points, desc, np.empty([0,3]))
 
 
 def build_flann_index(features, config):
