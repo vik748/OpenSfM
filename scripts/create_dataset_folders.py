@@ -34,10 +34,16 @@ import json
 import pandas as pd
 import time
 
-def execute_cmd(command):    
-    with Popen(command, stdout=PIPE, stderr=PIPE, bufsize=1, universal_newlines=True) as p:
+def execute_cmd(command, set_conda=False):    
+    if set_conda:
+        command = 'source ~/conda_init && conda activate simple_vslam_env && ' + command
+    with Popen(command, stdout=PIPE, stderr=PIPE, bufsize=1, 
+               shell=True, universal_newlines=True, executable='bash') as p:
         output = ""
         for line in p.stderr:
+            #print("\r\t>>> "+line, end='') # process line here
+            output+=line
+        for line in p.stdout:
             #print("\r\t>>> "+line, end='') # process line here
             output+=line
             
