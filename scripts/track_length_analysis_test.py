@@ -56,6 +56,8 @@ def tracks_histogram(recon_file, tracks_file, ax, model_num=0, bins=np.linspace(
 
     ax.hist(model_0_track_id_counts, bins=bins)
 
+    return model_0_track_id_counts
+
 
 ########################################
 #   Skerki_mud SIFT - RAW vs CLAHE - Model 0
@@ -198,3 +200,63 @@ tracks_histogram(recon_file, tracks_file, ax[1], bins=np.linspace(2,15,14))
 ax[1].set_title('CLAHE')
 ax[1].set_xlabel('Feature Track Length')
 ax[1].set_ylabel('Fequency')
+
+########################################
+#   Stingray SIFT - RAW vs CLAHE
+########################################
+recon_file = '/home/vik748/data/OpenSfM_data/track_length_test_data/Stingray/Stingray_SIFT_reconstruction.json'
+tracks_file = '/home/vik748/data/OpenSfM_data/track_length_test_data/Stingray/Stingray_SIFT_tracks.csv'
+
+fig6, ax = plt.subplots(nrows=2, sharex=True, sharey=True)
+fig6.suptitle('Stingray SIFT')
+
+tracks_histogram(recon_file, tracks_file, ax[0], bins=np.linspace(2,15,14))
+
+ax[0].set_xlim([2, None])
+ax[0].set_yscale('log')
+ax[0].set_ylim([None, 10000])
+ax[0].set_title('RAW')
+ax[0].set_xlabel('Feature Track Length')
+ax[0].set_ylabel('Fequency')
+ax[0].xaxis.set_major_locator(plt.MultipleLocator(1))
+
+recon_file = '/home/vik748/data/OpenSfM_data/track_length_test_data/Stingray/Stingray_CLAHE_SIFT_reconstruction.json'
+tracks_file = '/home/vik748/data/OpenSfM_data/track_length_test_data/Stingray/Stingray_CLAHE_SIFT_tracks.csv'
+
+tracks_histogram(recon_file, tracks_file, ax[1], bins=np.linspace(2,15,14))
+ax[1].set_title('CLAHE')
+ax[1].set_xlabel('Feature Track Length')
+ax[1].set_ylabel('Fequency')
+
+########################################
+#   Stingray Zernike - RAW vs CLAHE
+########################################
+recon_file = '/home/vik748/data/OpenSfM_data/track_length_test_data/Stingray/Stingray_ZERNIKE_reconstruction.json'
+tracks_file = '/home/vik748/data/OpenSfM_data/track_length_test_data/Stingray/Stingray_ZERNIKE_tracks.csv'
+
+fig7, ax = plt.subplots(nrows=2, sharex=True, sharey=True)
+fig7.suptitle('Stingray ZERNIKE')
+
+counts0 = tracks_histogram(recon_file, tracks_file, ax[0], bins=np.linspace(2,15,14))
+
+ax[0].set_xlim([2, None])
+ax[0].set_yscale('log')
+ax[0].set_ylim([None, 10000])
+ax[0].set_title('RAW')
+ax[0].set_xlabel('Feature Track Length')
+ax[0].set_ylabel('Fequency')
+ax[0].xaxis.set_major_locator(plt.MultipleLocator(1))
+
+recon_file = '/home/vik748/data/OpenSfM_data/track_length_test_data/Stingray/Stingray_CLAHE_ZERNIKE_reconstruction.json'
+tracks_file = '/home/vik748/data/OpenSfM_data/track_length_test_data/Stingray/Stingray_CLAHE_ZERNIKE_tracks.csv'
+
+counts1 = tracks_histogram(recon_file, tracks_file, ax[1], bins=np.linspace(2,15,14))
+ax[1].set_title('CLAHE')
+ax[1].set_xlabel('Feature Track Length')
+ax[1].set_ylabel('Fequency')
+
+
+
+plt.hist([counts1, counts2], np.linspace(2,15,14), label=['RAW', 'CLAHE'])
+plt.legend(loc='upper right')
+plt.show()

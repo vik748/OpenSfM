@@ -83,7 +83,7 @@ data_sets = ['skerki_mud', 'skerki_mud_CLAHE']
 plot_ys = ['cams', 'points']#, 'mean', 'rmse']
 y_labels = ['No of images registered', r'Avg No of points in Model$_0$']#, 'Mean Error against groundtruth', 'RMSE Error against groundtruth']
 fig,axes = plt.subplots(1,2)
-fig.set_size_inches(np.array([9, 5])/1.5)
+fig.set_size_inches(np.array([9, 5])/1)
 fig.suptitle(data_sets[0])
 colors = ['C0','C1','C2']
 line_style = ['-', '--']
@@ -92,30 +92,31 @@ markers = ['.', 'x']
 for dset, ls, mrk, col in zip(data_sets, line_style, markers, colors):
     for ax, y_name, ylabel in zip(axes.flatten(), plot_ys, y_labels):
         groupeddf.loc[(dset),y_name].unstack().plot(ax=ax, marker=mrk,ms=6, color=colors, linestyle=ls, legend=False)
-        ax.set_ylabel(ylabel, labelpad=-2)
-        ax.set_xlabel('Bit depth of images',labelpad=-2)
+        ax.set_ylabel(ylabel, labelpad=1)
+        ax.set_xlabel('Bit depth of images',labelpad=1)
         ax.set_xlim([8.1, 2.9])
         ax.xaxis.set_major_locator(plt.MultipleLocator(1))
 
 axes[0].set_ylim([0,65])
 axes[1].set_ylim([0,12000])
-axes[1].set_ylabel(ylabel, labelpad=-4)
+axes[1].set_ylabel(ylabel, labelpad=-3)
 
 handles, labels = ax.get_legend_handles_labels()
-labels = ['ORB', 'SIFT', 'ZER', 'ORB', 'SIFT', 'ZER']
-newlabels = [l+'_R' for l in labels[:3]] + [l+'_CL' for l in labels[:3]]
+#labels = ['ORB', 'SIFT', 'ZER', 'ORB', 'SIFT', 'ZER']
+newlabels = [l+'_RAW' for l in labels[:3]] + [l+'_CLAHE' for l in labels[:3]]
 
 fig.subplots_adjust(bottom=0.2,left=0.066, right=0.98,wspace=0.2 )
-axes[1].legend(flip(handles,3), flip(newlabels,3), labelspacing=0.1,
-           fontsize="small", columnspacing=0.4, handletextpad=0.2, loc='upper right')
-#axes[1].legend(handles, newlabels, loc='upper right')
+#axes[1].legend(flip(handles,3), flip(newlabels,3), labelspacing=0.1,
+#           fontsize="small", columnspacing=0.4, handletextpad=0.2, loc='upper right')
+fig.legend(flip(handles,3), flip(newlabels,3), ncol=3, loc='lower center')
 #axes[1].get_yaxis().set_major_formatter(
 #        mpl.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
 
-axes[1].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: human_format(x)))
+#axes[1].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: human_format(x)))
+axes[1].yaxis.set_major_formatter(FuncFormatter(lambda x, p: format(int(x), ',')))
 #ax.legend(handles,newlabels,loc='center left', bbox_to_anchor=(1, 0.5))
 #fig.tight_layout()
-save_fig2pdf(fig, size=np.array([9, 5])/1.5)
+save_fig2pdf(fig, size=np.array([9, 5])/1)
 
 #fig2 = plt.figure()
 #fig2.legend(handles, newlabels, loc='center')

@@ -21,7 +21,7 @@ starting processing structure:
             └── config_template.yaml
 
 resulting output structure
- 
+
 """
 import sys,os
 import logging
@@ -29,9 +29,12 @@ import numpy as np
 import re
 from shutil import copy, copytree, move
 import yaml
-#import subprocess #import PIPE, run, STDOUT        
+#import subprocess #import PIPE, run, STDOUT
 from subprocess import Popen, PIPE, CalledProcessError
-from opensfm import log
+try:
+    from opensfm import log
+except Exception as e: print(e)
+
 import json
 import pandas as pd
 import time
@@ -39,13 +42,14 @@ from transforms3d.quaternions import mat2quat
 from transforms3d.axangles import axangle2mat
 from datetime import datetime
 from itertools import product
+from matplotlib import pyplot as plt
 
 def execute_cmd(command, set_conda=False, cwd=None):
     if type(command) is list:
         command = ' '.join(command)
     if set_conda:
         command = 'source ~/conda_init && conda activate simple_vslam_env && ' + command
-    with Popen(command, stdout=PIPE, stderr=PIPE, bufsize=1, 
+    with Popen(command, stdout=PIPE, stderr=PIPE, bufsize=1,
                shell=True, universal_newlines=True, executable='bash', cwd=cwd) as p:
         output = ""
         for line in p.stderr:
@@ -54,7 +58,7 @@ def execute_cmd(command, set_conda=False, cwd=None):
         for line in p.stdout:
             #print("\r\t>>> "+line, end='') # process line here
             output+=line
-            
+
     if p.returncode != 0:
         print("\n\t>>> ".join(output.split('\n')[-20:]))
         raise CalledProcessError(p.returncode, p.args)
@@ -63,13 +67,13 @@ def execute_cmd(command, set_conda=False, cwd=None):
 def recon_results_summary(recon_file):
     with open(recon_file) as f:
         data = json.load(f)
-    
+
     results = ""
     image_names = ""
     results = results + "Number of models generated: {:d}".format(len(data))
     i=0
     res_dict = {"num_models": len(data)}
-    
+
     for i,model in enumerate(data):
         results += "\n\tModel {:d}:-".format(i)
         results += "\tImages: {:d}".format(len(model['shots']))
@@ -78,20 +82,20 @@ def recon_results_summary(recon_file):
         for image_name in model['shots'].keys():
             image_names += " " + image_name
         res_dict.update({"model_{:d}_num_cams".format(i) : len(model['shots']),
-                         "model_{:d}_num_points".format(i) : len(model['points']) })        
-        
+                         "model_{:d}_num_points".format(i) : len(model['points']) })
+
     return results, image_names, res_dict
 
 def evo_ape_results(stats_json):
     with open(stats_json) as f:
-        data = json.load(f)  
-        
+        data = json.load(f)
+
     return data
 
 def tracks_results_summary(recon_file):
     with open(recon_file) as f:
         data = json.load(f)
-        
+
     return data['num_tracks']
 
 def compose_T(R,t):
@@ -127,7 +131,7 @@ def world_axangle_t_2_object_poseRT(axis_angle_world, transl_world):
     #R_world,_ = cv2.Rodrigues(axis_angle_world)
     #the following is equivalent to opencv function above
     R_world = axangle2mat(axis_angle_world, np.linalg.norm(axis_angle_world))
-    R_obj, transl_obj = pose_inv(R_world, transl_world[:,np.newaxis])    
+    R_obj, transl_obj = pose_inv(R_world, transl_world[:,np.newaxis])
     return R_obj, transl_obj
 
 def set_axes_radius(ax, origin, radius):
@@ -233,13 +237,13 @@ def camname2time(name):
         return float(name.split('_')[1].split('-')[1])
     else:
         return None
-        
-        
+
+
 def metashapeposes2tum(ms_file, tum_file=None):
     '''
     This function converts metashape pose export file which is 'Image_name,4x4 Tmatrix as 1x16 row'
     to tum format for evo and rpg_trajector_evaluation packages as 'time x y z qx qy qz qw'
-    '''    
+    '''
     if tum_file is None:
         #filename = "/home/vik748/Downloads/Stingray2_08072018_every_10_camera_poses_in_mts_20200910.txt"
         name, ext = os.path.splitext(ms_file)
@@ -266,40 +270,40 @@ def opensfmshots2tum(shots, model_tum_file='reconstruction_model.txt', plot_pose
     '''
     This function converts opensfm reconstruction json file
     to tum format for evo and rpg_trajector_evaluation packages as 'time x y z qx qy qz qw'
-    '''    
-    if plot_poses:        
+    '''
+    if plot_poses:
         from matplotlib import pyplot as plt
         from mpl_toolkits.mplot3d import Axes3D
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         ax.set_aspect('equal')         # important!
         title = ax.set_title('3D Test')
-        
-    if len(shots) > 2:            
-                           
+
+    if len(shots) > 2:
+
         output_list = []
         time_list = []
         for cam_name, shot in sorted(shots.items()):
             axis_angle_world = np.array(shot['rotation'])
             t_world = np.array(shot['translation'])
-            
+
             R, t = world_axangle_t_2_object_poseRT(axis_angle_world, t_world)
-            
+
             qw, qx, qy, qz = mat2quat(R)
             i_time = camname2time(os.path.splitext(cam_name)[0])
             output_list.append([*t[:,0].tolist(), qx, qy, qz, qw])
             time_list.append(i_time)
-            
+
             if plot_poses:
                 plot_pose3RT_on_axes(ax, R, t.T, axis_length=.5)
                 set_axes_equal(ax)
                 plt.pause(.1)
-                
+
         df = pd.DataFrame(output_list, columns = ['x', 'y', 'z', 'qx', 'qy', 'qz', 'qw'], index=time_list)
         df.to_csv(model_tum_file, sep=' ', header=False)
         print("DF written to ",model_tum_file)
         return 0
-    else: 
+    else:
         return 1
 
 def align_and_combine_submodels(opensfm_json, tum_file_prefix=None, plot_poses = False):
@@ -307,10 +311,10 @@ def align_and_combine_submodels(opensfm_json, tum_file_prefix=None, plot_poses =
     This function opensfm reconstruction submodels into text files, then runs evo alignment
     and scaling and combines the resulting trajectories into a single file
     in tum format as 'time x y z qx qy qz qw'
-    '''    
+    '''
     gt_file = '../../groundtruth_tum.txt'
     recon_dir = os.path.dirname(opensfm_json)
-    
+
     if tum_file_prefix is None:
         combined_tum_file = os.path.splitext(opensfm_json)[0] +'_tum_combined.txt'
         tum_file = os.path.splitext(opensfm_json)[0] +'_tum.txt'
@@ -320,37 +324,37 @@ def align_and_combine_submodels(opensfm_json, tum_file_prefix=None, plot_poses =
 
     with open(opensfm_json) as f:
         data = json.load(f)
-        
+
     if len(data) > 0 and len(data[0]['shots']) > 2 :
         evo_traj_all_models_cmd = 'evo_traj tum -a -s --plot_mode=xy --save_plot submodel_trajs.png --no_warnings --ref={}'.format(gt_file)
         aligned_trajs = []
         for model_num, model in enumerate(data):
             shots = model['shots']
-            if len(shots) > 2:            
+            if len(shots) > 2:
                 name, ext = os.path.splitext(tum_file)
                 model_tum_file = os.path.join(recon_dir, '{}_m{:02d}{}'.format(name, model_num, ext))
                 opensfmshots2tum(shots, model_tum_file=model_tum_file, plot_poses = False)
-                
+
                 evo_traj_model_cmd = 'evo_traj tum -a -s --ref={} {} --save_as_tum --no_warnings'.format(
                                 gt_file, os.path.basename(model_tum_file))
                 evo_traj_all_models_cmd += ' ' + os.path.basename(model_tum_file)
-                
+
                 c,o = execute_cmd(evo_traj_model_cmd, set_conda=True, cwd=recon_dir)
                 print (o)
-                aligned_trajs.append(pd.read_csv(os.path.splitext(model_tum_file)[0]+".tum", 
-                                                 sep=' ', names=['time', 'x', 'y', 'z', 'qx', 'qy', 'qz', 'qw'], 
-                                                 index_col='time'))               
-                
-        
+                aligned_trajs.append(pd.read_csv(os.path.splitext(model_tum_file)[0]+".tum",
+                                                 sep=' ', names=['time', 'x', 'y', 'z', 'qx', 'qy', 'qz', 'qw'],
+                                                 index_col='time'))
+
+
         combined_traj_df = pd.concat(aligned_trajs).sort_index()
         combined_traj_df.to_csv(os.path.join(recon_dir, combined_tum_file), sep=' ', header=False)
-        
+
         print (evo_traj_all_models_cmd)
         c,o = execute_cmd(evo_traj_all_models_cmd, set_conda=True, cwd=recon_dir)
         print (o)
-        c,o = execute_cmd('for file in *.png; do if [[ "$file" != *_trim.png ]]; then convert "$file" -trim "${file%.png}_trim.png"; fi; done', 
+        c,o = execute_cmd('for file in *.png; do if [[ "$file" != *_trim.png ]]; then convert "$file" -trim "${file%.png}_trim.png"; fi; done',
                           set_conda=False, cwd=recon_dir)
-        
+
         # RUN analysis on model 0 trajectory
         model0_tum_file = '{}_m{:02d}{}'.format(name, 0, ext)
         traj_ape_model0_cmd = 'evo_ape tum -vas {} {} --no_warnings --save_results evo_ape_model0.zip'.format(gt_file, model0_tum_file)
@@ -359,8 +363,8 @@ def align_and_combine_submodels(opensfm_json, tum_file_prefix=None, plot_poses =
         print (o)
         c,o = execute_cmd(traj_ape_model0_unzip, set_conda=True, cwd=recon_dir)
         print (o)
-        evo_ape_results_dict = {'model0_'+k: v for k, v in evo_ape_results(recon_dir+'/evo_ape_model0/stats.json').items()} 
-        
+        evo_ape_results_dict = {'model0_'+k: v for k, v in evo_ape_results(recon_dir+'/evo_ape_model0/stats.json').items()}
+
         # RUN analysis on combined trajectory
         traj_ape_comb_cmd = 'evo_ape tum -vas {} {} --no_warnings --save_results evo_ape_comb.zip'.format(gt_file, combined_tum_file)
         traj_ape_comb_unzip = 'unzip -o evo_ape_comb.zip -d evo_ape_comb'
@@ -373,11 +377,11 @@ def align_and_combine_submodels(opensfm_json, tum_file_prefix=None, plot_poses =
         return evo_ape_results_dict
     else:
         return None
-        
+
 def single_run(run_config, opensfm_config = None):
     '''
-    Perform a single run where all the run settings are specified in the run_config dict 
-    
+    Perform a single run where all the run settings are specified in the run_config dict
+
     ex image_dataset_structure:
     └── image_dataset_location_root
         ├── image_depth_source
@@ -389,10 +393,10 @@ def single_run(run_config, opensfm_config = None):
 
     starting processing structure:
     └── processing_location_root
-        └── 
+        └──
             ├── camera_models_overrides.json
             └── config_template.yaml
-    
+
     resulting output structure
     └── processing_location_root
         └── image_dataset_name
@@ -408,85 +412,85 @@ def single_run(run_config, opensfm_config = None):
     # Switch to folder dataset_name folder under processing location
     log.setup()
     logger = logging.getLogger()
-    
-    results_df = pd.DataFrame(columns = ['set_title','n_bits', 'detector', 'descriptor', 'tracks', 
+
+    results_df = pd.DataFrame(columns = ['set_title','n_bits', 'detector', 'descriptor', 'tracks',
                                          'run', 'cams', 'points' ])
 
     nbits_map = {'RAW': 8, '7_bit': 7, '6_bit': 6, '5_bit': 5, '4_bit': 4, '3_bit': 3, '2_bit': 2, '1_bit': 1}
-    
+
     image_dataset_name = os.path.basename(run_config['image_dataset_location_root'])
-    
+
     result_config_dict = {'set_title': image_dataset_name,
                           'detector': run_config['feature_type'],
                           'descriptor': run_config['feature_type'],
                           'n_bits': nbits_map[run_config['image_depth']]}
-        
+
     os.chdir(os.path.join(run_config['processing_location_root'], image_dataset_name))
-    
-    # Create feature detector level folder    
+
+    # Create feature detector level folder
     fd_folder = image_dataset_name + '_' + run_config['feature_type']
     if not os.path.exists(fd_folder):
         os.makedirs(fd_folder)
     else:
         logger.info("Folder: {} already exists!".format(fd_folder))
 
-    image_depth_source = os.path.join(run_config['image_dataset_location_root'], 
+    image_depth_source = os.path.join(run_config['image_dataset_location_root'],
                                       image_dataset_name+'_' + run_config['image_depth'])
-     
+
     image_depth_target = os.path.join(fd_folder, image_dataset_name+'_' + run_config['image_depth'])
-    
+
     if opensfm_config is not None:
         image_depth_target += ''.join(['_{}_{}'.format(k,v) for k,v in sorted(opensfm_config.items())])
-    
+
     logger.info("Processing: {0}".format(run_config))
-    
+
     if not os.path.exists(image_depth_target):
         os.makedirs(image_depth_target)
     else:
         logger.info("Folder: {} already exists!".format(image_depth_target))
-    
+
     try:
         os.symlink(image_depth_source, os.path.join(image_depth_target,'images'))
         copy('camera_models_overrides.json', image_depth_target)
     except FileExistsError as err:
-        logger.info("FileExistsError error: {0}".format(err))    
-    
+        logger.info("FileExistsError error: {0}".format(err))
+
     with open(r'config_template.yaml') as file:
         config_dict = yaml.load(file)
-        
+
     detector_based_setting_dict = config_dict.pop('detector_based_settings').get(run_config['feature_type'])
     config_dict.update(detector_based_setting_dict)
-    
+
     config_dict['feature_type'] = run_config['feature_type']
-    
+
     if opensfm_config is not None:
         config_dict.update(opensfm_config)
-    
+
     with open(os.path.join(image_depth_target,'config.yaml'), 'w') as file:
         yaml_output = yaml.dump(config_dict, file, default_flow_style=False)
-    
-    opensfm_cmds = ["extract_metadata", "detect_features", "match_features", 
+
+    opensfm_cmds = ["extract_metadata", "detect_features", "match_features",
                     "create_tracks"]
     #opensfm_cmds = ["reconstruct"]
-    
+
     print(image_depth_target + ' : ',end='',flush=True)
     try:
         if not os.path.exists(image_depth_target+"_before_reconstruct"):
             for osfmcmd in opensfm_cmds:
                 print(osfmcmd + ' -> ',end='',flush=True)
-                command = [os.path.join(run_config['open_sfm_install_folder'], 'bin/opensfm'), 
+                command = [os.path.join(run_config['open_sfm_install_folder'], 'bin/opensfm'),
                            osfmcmd, image_depth_target]
                 #print(command)
-                c,o = execute_cmd(command)            
+                c,o = execute_cmd(command)
                 #print(o)
             copytree(image_depth_target, image_depth_target+"_before_reconstruct", symlinks=True)
-        
+
         else:
             logger.info("Folder: {} already exists, reusing matches!".format(image_depth_target+"_before_reconstruct"))
-        
+
         num_tracks = tracks_results_summary(os.path.join(image_depth_target, "reports", "tracks.json"))
         result_config_dict.update({'tracks': num_tracks})
-        
+
         for i in range(run_config['num_reconstructions']):
             result_config_dict.update({'run': i, 'cams': 0, 'points': 0})
             if num_tracks > 0:
@@ -494,7 +498,7 @@ def single_run(run_config, opensfm_config = None):
                 if os.path.exists(curr_run_fold):
                     move(curr_run_fold, curr_run_fold+'_old_'+time.strftime("%Y%m%d_%H%M%S"))
                 copytree(image_depth_target, curr_run_fold, symlinks=True)
-                command = [os.path.join(run_config['open_sfm_install_folder'], 'bin/opensfm'), 
+                command = [os.path.join(run_config['open_sfm_install_folder'], 'bin/opensfm'),
                            'reconstruct', curr_run_fold]
                 execute_cmd(command)
                 results, model_image_names, recon_res_dict = recon_results_summary(os.path.join(curr_run_fold, "reconstruction.json"))
@@ -504,9 +508,9 @@ def single_run(run_config, opensfm_config = None):
                                            'points': recon_res_dict.get('model_0_num_points',0)})
                 if opensfm_config is not None:
                     result_config_dict.update(opensfm_config)
-                
+
             results_df = results_df.append(result_config_dict, ignore_index=True)
-        
+
     except CalledProcessError as err:
         logger.warning("{0} Failed!!! \nCalledProcessError error: {1}".format(image_depth_target,err))
 
@@ -514,8 +518,8 @@ def single_run(run_config, opensfm_config = None):
 
 def dict2combinations (dict_in):
     '''
-    Given a dictionary where each key points to a list return an iterator which 
-    returns dicts with a combination from each list. eg. 
+    Given a dictionary where each key points to a list return an iterator which
+    returns dicts with a combination from each list. eg.
         dict_in = {"num": [1, 2, 3],
                    "letter": ['a', 'b', 'c'],
                    "an":'c'}
@@ -527,19 +531,54 @@ def dict2combinations (dict_in):
                     {'num': 2, 'letter': 'c', 'an': 'c'}
                     {'num': 3, 'letter': 'a', 'an': 'c'}
                     {'num': 3, 'letter': 'b', 'an': 'c'}
-                    {'num': 3, 'letter': 'c', 'an': 'c'}    
+                    {'num': 3, 'letter': 'c', 'an': 'c'}
     '''
     for combination in product(*dict_in.values()):
         d = dict(zip(dict_in.keys(), combination))
         yield d
-        
+
 def dict2combinations_length(dict_in):
     '''
     Given a dictionary where each key points to list, return the possibile combinations
     by multiplying the lengths of each list
     '''
     prod_len = 1
-    for v in dict_in.values():    
+    for v in dict_in.values():
         if type(v) == list:
             prod_len *= len(v)
     return prod_len
+
+def save_fig2pdf(fig, size=None, folder=None, fname=None):
+    #plt._pylab_helpers.Gcf.figs.get(fig.number, None).window.showMaximized()
+    #plt.pause(.1)
+    if size is not None:
+        fig.set_size_inches(size)
+    if fname is None:
+        if fig._suptitle is None:
+            fname = 'figure_{:d}'.format(fig.number)
+        else:
+            ttl = fig._suptitle.get_text()
+            ttl = ttl.replace('$','').replace('\n','_').replace(' ','_')
+            fname = re.sub(r"\_\_+", "_", ttl)
+    if folder:
+        plt.savefig(os.path.join(folder, fname +'_'+datetime.now().strftime("%Y%m%d%H%M%S") +'.pdf'),format='pdf', dpi=1200,  orientation='landscape', papertype='letter')
+    else:
+        plt.savefig(fname +'_'+datetime.now().strftime("%Y%m%d%H%M%S") +'.pdf',format='pdf', dpi=1200,  orientation='landscape', papertype='letter')
+
+    plt._pylab_helpers.Gcf.figs.get(fig.number, None).window.showNormal()
+
+def save_fig2png(fig, size=None, folder=None, fname=None):
+    if size is not None:
+        fig.set_size_inches(size)
+    plt.pause(.1)
+    if fname is None:
+        if fig._suptitle is None:
+            fname = 'figure_{:d}'.format(fig.number)
+        else:
+            ttl = fig._suptitle.get_text()
+            ttl = ttl.replace('$','').replace('\n','_').replace(' ','_')
+            fname = re.sub(r"\_\_+", "_", ttl)
+    if folder:
+        plt.savefig(os.path.join(folder, fname +'_'+datetime.now().strftime("%Y%m%d%H%M%S") +'.pdf'),format='pdf', dpi=1200,  orientation='landscape', papertype='letter')
+    else:
+        plt.savefig(fname +'_'+datetime.now().strftime("%Y%m%d%H%M%S") +'.png',format='png', dpi=100)

@@ -30,7 +30,6 @@ def resized_image(image, config):
     else:
         return image
 
-
 def root_feature(desc, l2_normalization=False):
     if l2_normalization:
         s2 = np.linalg.norm(desc, axis=1)
@@ -38,7 +37,6 @@ def root_feature(desc, l2_normalization=False):
     s = np.sum(desc, 1)
     desc = np.sqrt(desc.T / s).T
     return desc
-
 
 def root_feature_surf(desc, l2_normalization=False, partial=False):
     """
@@ -167,12 +165,12 @@ def extract_features_sift(image, config):
     sift_edge_threshold = config['sift_edge_threshold']
     sift_peak_threshold = float(config['sift_peak_threshold'])
     feature_tiling = config.get('feature_tiling')
-    
+
     if not feature_tiling is None:
         no_features = 2 * config['feature_min_frames']
     else:
         no_features = config['feature_min_frames']
-    
+
     if context.OPENCV3:
         try:
             detector = cv2.xfeatures2d.SIFT_create(
@@ -204,13 +202,13 @@ def extract_features_sift(image, config):
         else:
             logger.debug('done')
             break
-    
-    if not feature_tiling is None:        
-        points = tiled_features(points, image.shape, 
-                                feature_tiling['horizontal'], feature_tiling['vertical'], 
+
+    if not feature_tiling is None:
+        points = tiled_features(points, image.shape,
+                                feature_tiling['horizontal'], feature_tiling['vertical'],
                                 no_features = int(config['feature_min_frames']) )
         logger.debug('No SIFT features after tiling {0}'.format(len(points)))
-        
+
     points, desc = descriptor.compute(image, points)
     if config['feature_root']:
         desc = root_feature(desc)
@@ -323,12 +321,12 @@ def extract_features_hahog(image, config):
 def extract_features_orb(image, config):
     feature_tiling = config.get('feature_tiling')
     orb_fast_threshold = int(config['ORB_settings']['fastThreshold'])
-    
+
     if not feature_tiling is None:
         no_features = 2 * int(config['feature_min_frames'])
     else:
         no_features = int(config['feature_min_frames'])
-    
+
     if context.OPENCV3:
         detector = cv2.ORB_create(nfeatures=no_features,
                                   **config['ORB_settings'])
@@ -338,7 +336,7 @@ def extract_features_orb(image, config):
         descriptor = cv2.DescriptorExtractor_create('ORB')
         detector.setDouble('nFeatures', no_features)
         detector.setInt('fastThreshold', orb_fast_threshold)
-        
+
     while True:
         logger.debug('Computing orb with threshold {0}'.format(orb_fast_threshold))
         t = time.time()
@@ -359,9 +357,9 @@ def extract_features_orb(image, config):
     logger.debug('Computing ORB')
     t = time.time()
     points = detector.detect(image)
-    
+
     if not feature_tiling is None:
-        points = tiled_features(points, image.shape, 
+        points = tiled_features(points, image.shape,
                                 feature_tiling['horizontal'], feature_tiling['vertical'],
                                 no_features = int(config['feature_min_frames']) )
         logger.debug('No ORB features after tiling {0}'.format(len(points)))
@@ -374,12 +372,12 @@ def extract_features_orb(image, config):
 
 def extract_features_zernike(image, config):
     if context.OPENCV3:
-        from zernike_py.MultiHarrisZernike import MultiHarrisZernike                        
-            
+        from zernike_py.MultiHarrisZernike import MultiHarrisZernike
+
         MultiHarrisZernike_cached = memory.cache(MultiHarrisZernike)
-        
+
         #t = time.time()
-        detector = MultiHarrisZernike_cached(Nfeats= int(config['feature_min_frames']), 
+        detector = MultiHarrisZernike_cached(Nfeats= int(config['feature_min_frames']),
                                              **config['ZERNIKE_settings'])
         #logger.debug('Detector created in {:.4f}s'.format(time.time() - t))
 
@@ -424,13 +422,13 @@ def extract_features(color_image, config):
         points, desc = extract_features_hahog(image, config)
     elif feature_type == 'ORB':
         points, desc = extract_features_orb(image, config)
-    elif feature_type == 'ZERNIKE':        
-        points, desc = extract_features_zernike(image, config)        
+    elif feature_type == 'ZERNIKE':
+        points, desc = extract_features_zernike(image, config)
     else:
         raise ValueError('Unknown feature type '
                          '(must be SURF, SIFT, AKAZE, HAHOG, ORB or ZERNIKE)')
 
-    if len(points)>0:    
+    if len(points)>0:
         xs = points[:, 0].round().astype(int)
         ys = points[:, 1].round().astype(int)
         colors = color_image[ys, xs]
